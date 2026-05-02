@@ -1,5 +1,30 @@
 const API_BASE_URL = "https://support-backend-ldos.onrender.com/api";
 
+function formatName(input) {
+    let text = input.value;
+    // Split the text by spaces, commas, or hyphens to capitalize each word/part
+    let formattedText = text.replace(/([^\W_]+[^\s-]*) */g, function(word) {
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    });
+    input.value = formattedText;
+}
+
+function formatStudentId(input) {
+    let value = input.value.replace(/\D/g, ''); 
+    
+    if (value.startsWith('0622') || value.startsWith('0623') || value.startsWith('0624') || value.startsWith('0625') || value.startsWith('0626')) {
+        let formattedValue = '';
+        if (value.length > 0) formattedValue += value.substring(0, 2);
+        if (value.length > 2) formattedValue += '-' + value.substring(2, 6);
+        if (value.length > 6) formattedValue += '-' + value.substring(6, 12);
+        input.value = formattedValue;
+    } 
+    // Otherwise, let them type normally but only allow numbers and dashes
+    else {
+        input.value = input.value.replace(/[^0-9-]/g, '');
+    }
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
