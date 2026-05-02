@@ -16,9 +16,12 @@
         <p class="subtitle">Please fill out your official details below.</p>
 
         <form onsubmit="submitRegistration(event)">
-            <input type="text" id="reg-name" placeholder="Last Name, First Name, Middle Name - Small Letter" required>
-            <input type="text" id="reg-id" placeholder="Student ID Number" required>
+            <label class="schedule-label" style="margin-bottom: 5px;">Name: (Last Name, First Name MI.)</label>
+            <input type="text" id="reg-name" placeholder="E.g., Dela Cruz, Juan M." required oninput="formatName(this)">
             
+            <label class="schedule-label" style="margin-bottom: 5px; margin-top: 15px;">Student Number:</label>
+            <input type="text" id="reg-id" placeholder="06-2*2*-******" required oninput="formatStudentId(this)">
+
             <select id="reg-gc" onchange="toggleOtherGC(this.value)" required>
                 <option value="">-- Select Group Chat Handle --</option>
                 <option value="BSA">BSA</option>
