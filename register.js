@@ -1,103 +1,178 @@
+console.log("%cSTOP!", "color: red; font-size: 50px; font-weight: bold; font-family: sans-serif; text-shadow: 2px 2px 0 #000;");
+console.log("%cBawal ka dito panget", "color: white; background: red; font-size: 16px; padding: 5px 10px; border-radius: 5px;");
+
 const API_BASE_URL = "https://support-backend-ldos.onrender.com/api";
+const COOLDOWN_TIME = 5 * 60 * 1000; // 5 minutes in milliseconds
+let cooldownInterval;
 
-function formatName(input) {
-    let text = input.value;
-    // Split the text by spaces, commas, or hyphens to capitalize each word/part
-    let formattedText = text.replace(/([^\W_]+[^\s-]*) */g, function(word) {
-        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-    });
-    input.value = formattedText;
-}
-
-function formatStudentId(input) {
-    let value = input.value.replace(/\D/g, ''); 
-    
-    if (value.startsWith('0622') || value.startsWith('0623') || value.startsWith('0624') || value.startsWith('0625') || value.startsWith('0626')) {
-        let formattedValue = '';
-        if (value.length > 0) formattedValue += value.substring(0, 2);
-        if (value.length > 2) formattedValue += '-' + value.substring(2, 6);
-        if (value.length > 6) formattedValue += '-' + value.substring(6, 12);
-        input.value = formattedValue;
-    } 
-    // Otherwise, let them type normally but only allow numbers and dashes
-    else {
-        input.value = input.value.replace(/[^0-9-]/g, '');
-    }
-}
-
-document.addEventListener("DOMContentLoaded", async () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
-
-    if (!token) {
-        showError("Invalid Link. Please request a new link from the Support Head.");
-        return;
-    }
-
-    try {
-        const res = await fetch(`${API_BASE_URL}/register/validate?token=${token}`);
-        const data = await res.json();
-        
-        if (!data.valid) {
-            showError("This registration link has expired or is invalid.");
-        } else {
-            document.getElementById('loading-screen').style.display = 'none';
-            document.getElementById('register-form-container').style.display = 'block';
-        }
-    } catch (err) {
-        showError("Cannot connect to the server. Please try again later.");
-    }
+// On Page Load: Check if user is in cooldown
+document.addEventListener('DOMContentLoaded', () => {
+    startCooldownTimer();
 });
 
-function showError(msg) {
-    document.getElementById('loading-screen').innerHTML = `<h3 style="color: #ef4444;">❌ ${msg}</h3>`;
+function toggleOther(val) {
+    const otherInput = document.getElementById('stu-gc-other');
+    if (val === 'Other') {
+        otherInput.style.display = 'block';
+        otherInput.required = true;
+    } else {
+        otherInput.style.display = 'none';
+        otherInput.required = false;
+        otherInput.value = '';
+    }
 }
 
-function toggleOtherGC(val) {
-    document.getElementById('reg-gc-other').style.display = val === 'Other' ? 'block' : 'none';
+function showMessage(text, isError) {
+    const msgEl = document.getElementById('statusMessage');
+    msgEl.textContent = text;
+    msgEl.className = 'message ' + (isError ? 'error' : 'success');
+    
+    // Clear message after 5 seconds
+    setTimeout(() => { msgEl.textContent = ''; }, 5000);
 }
 
-async function submitRegistration(event) {
-    event.preventDefault();
-    
-    const name = document.getElementById('reg-name').value.trim();
-    const idNum = document.getElementById('reg-id').value.trim();
-    let gcHandle = document.getElementById('reg-gc').value;
-    
-    if (gcHandle === 'Other') gcHandle = document.getElementById('reg-gc-other').value.trim();
+function closeModal() {
+    document.getElementById('success-modal').style.display = 'none';
+    // Optionally un-hide the form if they close it, though they are technically done.
+    document.getElementById('registrationForm').style.display = 'block';
+}
 
-    const days = [];
-    document.querySelectorAll('input[name="schedule"]:checked').forEach(cb => days.push(cb.value));
+function startCooldownTimer() {
+    const lastReg = localStorage.getItem('registration_cooldown_time');
+    if (!lastReg) return;
+    
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    
+    clearInterval(cooldownInterval);
+    cooldownInterval = setInterval(() => {
+        const timePassed = Date.now() - parseInt(lastReg);
+        const timeLeft = COOLDOWN_TIME - timePassed;
+        
+        if (timeLeft <= 0) {
+            clearInterval(cooldownInterval);
+            localStorage.removeItem('registration_cooldown_time');
+            btn.disabled = false;
+            btn.textContent = 'REGISTER NOW';
+        } else {
+            const mins = Math.floor(timeLeft / 60000);
+            const secs = Math.floor((timeLeft % 60000) / 1000);
+            btn.textContent = `COOLDOWN (${mins}:${secs.toString().padStart(2, '0')})`;
+        }
+    }, 1000);
+}
 
-    if (!gcHandle || days.length === 0) {
-        alert("Please select a Group Chat Handle and at least one schedule day.");
+document.getElementById('registrationForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const btn = document.getElementById('submitBtn');
+    
+    // Failsafe check
+    if (localStorage.getItem('registration_cooldown_time')) {
+        const timePassed = Date.now() - parseInt(localStorage.getItem('registration_cooldown_time'));
+        if (timePassed < COOLDOWN_TIME) {
+            showMessage('Please wait for the cooldown to expire before registering again.', true);
+            return;
+        }
+    }
+
+    const name = document.getElementById('stu-name').value.trim();
+    const idNum = document.getElementById('stu-id').value.trim();
+    const classLevel = document.getElementById('stu-class').value;
+    let gcHandle = document.getElementById('stu-gc').value;
+    const selectedDays = Array.from(document.querySelectorAll('.day-checkbox:checked')).map(cb => cb.value);
+
+    if (gcHandle === 'Other') {
+        gcHandle = document.getElementById('stu-gc-other').value.trim();
+    }
+
+    if (!name || !idNum || !gcHandle || !classLevel) {
+        showMessage('Please fill in all required fields.', true);
         return;
     }
 
+    if (selectedDays.length === 0) {
+        showMessage('Please select at least one day for your schedule.', true);
+        return;
+    }
+
+    // Immediately lock button to prevent double-clicks
+    btn.disabled = true;
+    btn.textContent = 'SUBMITTING...';
+
+    let isSuccess = false;
+
     try {
-        // 1. Verify ID doesn't already exist
-        const getRes = await fetch(`${API_BASE_URL}/students`);
-        const students = await getRes.json();
-        if (students.some(s => s.id === idNum)) {
-            alert("This Student ID is already registered!");
-            return;
+        // 1. Check Lock Status
+        try {
+            const configRes = await fetch(`${API_BASE_URL}/config/status`);
+            if (configRes.ok) {
+                const config = await configRes.json();
+                if (config.isLocked) {
+                    showMessage('Registration is currently closed by the Admin.', true);
+                    return; 
+                }
+            }
+        } catch (err) {
+            console.warn("Could not check lock status, proceeding anyway.");
         }
 
-        // 2. Submit to database
-        const newStudent = { id: idNum, name: name, gcHandle: gcHandle, assignedDays: days };
-        await fetch(`${API_BASE_URL}/students`, {
+        // 2. Duplicate ID Check
+        const checkRes = await fetch(`${API_BASE_URL}/students`);
+        if (checkRes.ok) {
+            const existingStudents = await checkRes.json();
+            
+            // Look for matching ID (case-insensitive)
+            if (existingStudents.some(s => String(s.id).toLowerCase() === String(idNum).toLowerCase())) {
+                showMessage('This Student ID is already registered!', true);
+                return; 
+            }
+        }
+
+        const payload = {
+            name: name,
+            id: idNum,
+            classLevel: classLevel,
+            gcHandle: gcHandle,
+            assignedDays: selectedDays 
+        };
+
+        // 3. Post to backend
+        const response = await fetch(`${API_BASE_URL}/students`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(newStudent)
+            body: JSON.stringify(payload)
         });
 
-        // 3. Show Success Message
-        document.getElementById('register-form-container').innerHTML = `
-            <h2 style="color: #22c55e; margin-bottom: 20px;">✅ Registration Complete!</h2>
-            <p style="color: #94a3b8; line-height: 1.5;">Your data and schedule have been successfully sent to the central database.</p>
-            <p style="color: #94a3b8;">You may now close this window.</p>
-        `;
-    } catch(err) {
-        alert("Server error while saving your registration.");
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+                isSuccess = true;
+                
+                // Hide the Registration Form and show the GIF Modal
+                document.getElementById('registrationForm').style.display = 'none';
+                document.getElementById('success-modal').style.display = 'flex';
+                
+                // Clear Form silently in the background
+                document.getElementById('registrationForm').reset();
+                document.getElementById('stu-gc-other').style.display = 'none';
+                
+                // Trigger Cooldown
+                localStorage.setItem('registration_cooldown_time', Date.now());
+                startCooldownTimer();
+            } else {
+                showMessage(data.message || 'Error saving registration.', true);
+            }
+        } else {
+            showMessage('Server error. Please try again later.', true);
+        }
+
+    } catch (error) {
+        showMessage('Network error. Unable to connect to server.', true);
+    } finally {
+        if (!isSuccess) {
+            btn.disabled = false;
+            btn.textContent = 'REGISTER NOW';
+        }
     }
-}
+});
