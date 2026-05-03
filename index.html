@@ -13,6 +13,7 @@
             --accent: #66fcf1;
             --accent-hover: #45a29e;
             --error: #ef4444;
+            --success: #22c55e; /* Added Success Color */
         }
 
         body {
@@ -45,7 +46,6 @@
             margin-bottom: 20px;
         }
 
-        /* NEW: Highlighted Warning Text */
         .warning-box {
             background-color: rgba(239, 68, 68, 0.15);
             color: var(--error);
@@ -132,7 +132,7 @@
             min-height: 20px;
         }
 
-        .success { color: #22c55e; }
+        .success { color: var(--success); }
         .error { color: var(--error); }
     </style>
 </head>
@@ -141,9 +141,8 @@
     <div class="container">
         <h2>Student Support Registration</h2>
         
-        <!-- UPDATED WARNING TEXT -->
         <div class="warning-box">
-            Please fill out the form and follow the instructions carefully. Double-check your answers before submitting. Any mistakes MAY RESULTS IN NO ATTENDANCE BEING RECORDED.
+            Please fill out the form and follow the instructions carefully. Double-check your answers before submitting. Any mistakes MAY RESULT IN NO ATTENDANCE BEING RECORDED.
         </div>
 
         <form id="registrationForm">
@@ -157,7 +156,6 @@
                 <input type="text" id="stu-id" placeholder="e.g. 06-2425-01234" required>
             </div>
 
-            <!-- NEW: Class Level Selection with Instructions -->
             <div class="form-group">
                 <label>Class Level</label>
                 <p class="instructions">Select "Freshmen" if this is your first year, otherwise select "UpperClassmen".</p>
@@ -221,6 +219,8 @@
             const msgEl = document.getElementById('statusMessage');
             msgEl.textContent = text;
             msgEl.className = 'message ' + (isError ? 'error' : 'success');
+            
+            // Clear message after 5 seconds
             setTimeout(() => { msgEl.textContent = ''; }, 5000);
         }
 
@@ -242,35 +242,48 @@
                 return;
             }
 
+            // Immediately lock button to prevent double-clicks
             btn.disabled = true;
             btn.textContent = 'SUBMITTING...';
 
-            // Check if backend is locked (optional safety measure)
+            let isSuccess = false;
+
             try {
-                const configRes = await fetch(`${API_BASE_URL}/config/status`);
-                if (configRes.ok) {
-                    const config = await configRes.json();
-                    if (config.isLocked) {
-                        showMessage('Registration is currently closed by the Admin.', true);
-                        btn.disabled = false;
-                        btn.textContent = 'REGISTER NOW';
-                        return;
+                // 1. Check if backend is locked
+                try {
+                    const configRes = await fetch(`${API_BASE_URL}/config/status`);
+                    if (configRes.ok) {
+                        const config = await configRes.json();
+                        if (config.isLocked) {
+                            showMessage('Registration is currently closed by the Admin.', true);
+                            return; // Breaks out to the finally block
+                        }
+                    }
+                } catch (err) {
+                    console.warn("Could not check lock status, proceeding anyway.");
+                }
+
+                // 2. NEW: PREVENT DUPLICATES - Check if student ID is already registered
+                const checkRes = await fetch(`${API_BASE_URL}/students`);
+                if (checkRes.ok) {
+                    const existingStudents = await checkRes.json();
+                    
+                    // Look for matching ID (case-insensitive)
+                    if (existingStudents.some(s => s.id.toLowerCase() === idNum.toLowerCase())) {
+                        showMessage('This Student ID is already registered!', true);
+                        return; // Breaks out to the finally block
                     }
                 }
-            } catch (err) {
-                console.warn("Could not check lock status, proceeding anyway.");
-            }
 
-            const payload = {
-                name: name,
-                id: idNum,
-                classLevel: classLevel,
-                gcHandle: gcHandle,
-                assignedDays: [] // Defaults to unassigned
-            };
+                const payload = {
+                    name: name,
+                    id: idNum,
+                    classLevel: classLevel,
+                    gcHandle: gcHandle,
+                    assignedDays: [] // Defaults to unassigned
+                };
 
-            try {
-                // Post directly to the backend to add the student
+                // 3. Post directly to the backend to add the student
                 const response = await fetch(`${API_BASE_URL}/students`, {
                     method: 'POST',
                     headers: {
@@ -285,6 +298,7 @@
                         showMessage('Registration Successful! You may close this page.', false);
                         document.getElementById('registrationForm').reset();
                         document.getElementById('stu-gc-other').style.display = 'none';
+                        isSuccess = true;
                     } else {
                         showMessage(data.message || 'Error saving registration.', true);
                     }
@@ -295,8 +309,17 @@
             } catch (error) {
                 showMessage('Network error. Unable to connect to server.', true);
             } finally {
-                btn.disabled = false;
-                btn.textContent = 'REGISTER NOW';
+                // If successful, permanently lock the button with a green success message
+                if (isSuccess) {
+                    btn.textContent = 'REGISTERED ✔';
+                    btn.style.backgroundColor = 'var(--success)';
+                    btn.style.color = '#000';
+                    // We purposefully leave btn.disabled = true here!
+                } else {
+                    // Only unlock the button if it failed, so they can try again
+                    btn.disabled = false;
+                    btn.textContent = 'REGISTER NOW';
+                }
             }
         });
     </script>
