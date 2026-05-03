@@ -367,8 +367,15 @@
                 return;
             }
 
+            // Lock button and start loop animation
             btn.disabled = true;
-            btn.textContent = 'SUBMITTING...';
+            let dotCount = 1;
+            btn.textContent = 'Registering.';
+            
+            const loadingInterval = setInterval(() => {
+                dotCount = (dotCount % 3) + 1; // Cycles 1, 2, 3
+                btn.textContent = 'Registering' + '.'.repeat(dotCount);
+            }, 400); // 400ms update speed
 
             let isSuccess = false;
 
@@ -433,7 +440,14 @@
             } catch (error) {
                 showMessage('Network error. Unable to connect to server.', true);
             } finally {
-                if (!isSuccess) {
+                // Stop the text animation loop
+                clearInterval(loadingInterval);
+
+                if (isSuccess) {
+                    btn.textContent = 'REGISTERED ✔';
+                    btn.style.backgroundColor = 'var(--success)';
+                    btn.style.color = '#000';
+                } else {
                     btn.disabled = false;
                     btn.textContent = 'REGISTER NOW';
                 }
