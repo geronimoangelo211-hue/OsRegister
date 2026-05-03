@@ -219,7 +219,6 @@
 
             <div class="form-group">
                 <label>Class Level</label>
-                <!-- Removed instructions -->
                 <select id="stu-class" required>
                     <option value="">-- Select Class Level --</option>
                     <option value="Freshmen">Freshmen</option>
@@ -229,7 +228,6 @@
 
             <div class="form-group">
                 <label>GC Handle / Department</label>
-                <!-- Removed instructions -->
                 <select id="stu-gc" onchange="toggleOther(this.value)" required>
                     <option value="">-- Select GC Handle --</option>
                     <option value="BSA">BSA</option>
@@ -276,20 +274,17 @@
     <!-- Success GIF Modal -->
     <div id="success-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content">
-            <!-- Points to the specific file in your repo -->
             <img src="thank-you-gif-6.gif" alt="Success!">
             <h3 style="color: var(--accent); margin-top: 0; margin-bottom: 10px;">Registration Complete!</h3>
             <p style="color: var(--text-muted); font-size: 14px; margin: 0;">You have successfully registered your support schedule. You may now safely close this window.</p>
-            <button onclick="closeModal()" style="margin-top: 20px;">Got it!</button>
         </div>
     </div>
 
     <script>
         const API_BASE_URL = "https://support-backend-ldos.onrender.com/api";
-        const COOLDOWN_TIME = 5 * 60 * 1000; // 5 minutes in milliseconds
+        const COOLDOWN_TIME = 5 * 60 * 1000; 
         let cooldownInterval;
 
-        // On Page Load: Check if user is in cooldown
         document.addEventListener('DOMContentLoaded', () => {
             startCooldownTimer();
         });
@@ -310,11 +305,8 @@
             const msgEl = document.getElementById('statusMessage');
             msgEl.textContent = text;
             msgEl.className = 'message ' + (isError ? 'error' : 'success');
+            
             setTimeout(() => { msgEl.textContent = ''; }, 5000);
-        }
-
-        function closeModal() {
-            document.getElementById('success-modal').style.display = 'none';
         }
 
         function startCooldownTimer() {
@@ -347,7 +339,6 @@
             
             const btn = document.getElementById('submitBtn');
             
-            // Failsafe check
             if (localStorage.getItem('registration_cooldown_time')) {
                 const timePassed = Date.now() - parseInt(localStorage.getItem('registration_cooldown_time'));
                 if (timePassed < COOLDOWN_TIME) {
@@ -382,7 +373,6 @@
             let isSuccess = false;
 
             try {
-                // 1. Check Lock Status
                 try {
                     const configRes = await fetch(`${API_BASE_URL}/config/status`);
                     if (configRes.ok) {
@@ -396,11 +386,11 @@
                     console.warn("Could not check lock status, proceeding anyway.");
                 }
 
-                // 2. Duplicate ID Check
                 const checkRes = await fetch(`${API_BASE_URL}/students`);
                 if (checkRes.ok) {
                     const existingStudents = await checkRes.json();
-                    if (existingStudents.some(s => s.id.toLowerCase() === idNum.toLowerCase())) {
+                    
+                    if (existingStudents.some(s => String(s.id).toLowerCase() === String(idNum).toLowerCase())) {
                         showMessage('This Student ID is already registered!', true);
                         return; 
                     }
@@ -414,7 +404,6 @@
                     assignedDays: selectedDays 
                 };
 
-                // 3. Post to backend
                 const response = await fetch(`${API_BASE_URL}/students`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -426,14 +415,12 @@
                     if (data.success) {
                         isSuccess = true;
                         
-                        // Show GIF Pop-up
+                        document.getElementById('registrationForm').style.display = 'none';
                         document.getElementById('success-modal').style.display = 'flex';
                         
-                        // Clear Form
                         document.getElementById('registrationForm').reset();
                         document.getElementById('stu-gc-other').style.display = 'none';
                         
-                        // Trigger Cooldown
                         localStorage.setItem('registration_cooldown_time', Date.now());
                         startCooldownTimer();
                     } else {
