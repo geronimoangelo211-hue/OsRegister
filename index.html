@@ -13,7 +13,7 @@
             --accent: #66fcf1;
             --accent-hover: #45a29e;
             --error: #ef4444;
-            --success: #22c55e; /* Added Success Color */
+            --success: #22c55e;
         }
 
         body {
@@ -80,7 +80,7 @@
             font-style: italic;
         }
 
-        input, select {
+        input[type="text"], select {
             width: 100%;
             padding: 12px;
             background-color: #121419;
@@ -93,8 +93,43 @@
             transition: border-color 0.3s;
         }
 
-        input:focus, select:focus {
+        input[type="text"]:focus, select:focus {
             border-color: var(--accent);
+        }
+
+        /* Schedule Checkbox Grid Styling */
+        .schedule-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .schedule-grid label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: normal;
+            font-size: 0.85rem;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 0;
+            border: 1px solid transparent;
+            transition: background 0.2s, border-color 0.2s;
+        }
+
+        .schedule-grid label:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .schedule-grid input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            cursor: pointer;
+            accent-color: var(--accent);
         }
 
         button {
@@ -108,7 +143,7 @@
             font-size: 15px;
             cursor: pointer;
             transition: background-color 0.3s, transform 0.1s;
-            margin-top: 10px;
+            margin-top: 15px;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
@@ -194,6 +229,21 @@
                 <input type="text" id="stu-gc-other" style="display:none; margin-top: 10px;" placeholder="Type Custom GC Handle">
             </div>
 
+            <!-- NEW: Schedule Assignment -->
+            <div class="form-group">
+                <label>Shift Schedule Assignment</label>
+                <p class="instructions">Select the specific days you are required to log in for duty.</p>
+                <div class="schedule-grid">
+                    <label><input type="checkbox" class="day-checkbox" value="Monday"> Monday</label>
+                    <label><input type="checkbox" class="day-checkbox" value="Tuesday"> Tuesday</label>
+                    <label><input type="checkbox" class="day-checkbox" value="Wednesday"> Wednesday</label>
+                    <label><input type="checkbox" class="day-checkbox" value="Thursday"> Thursday</label>
+                    <label><input type="checkbox" class="day-checkbox" value="Friday"> Friday</label>
+                    <label><input type="checkbox" class="day-checkbox" value="Saturday"> Saturday</label>
+                    <label style="grid-column: 1 / -1; justify-content: center;"><input type="checkbox" class="day-checkbox" value="Sunday"> Sunday</label>
+                </div>
+            </div>
+
             <button type="submit" id="submitBtn">REGISTER NOW</button>
             <div id="statusMessage" class="message"></div>
         </form>
@@ -220,7 +270,6 @@
             msgEl.textContent = text;
             msgEl.className = 'message ' + (isError ? 'error' : 'success');
             
-            // Clear message after 5 seconds
             setTimeout(() => { msgEl.textContent = ''; }, 5000);
         }
 
@@ -233,12 +282,20 @@
             const classLevel = document.getElementById('stu-class').value;
             let gcHandle = document.getElementById('stu-gc').value;
 
+            // Get selected schedule days
+            const selectedDays = Array.from(document.querySelectorAll('.day-checkbox:checked')).map(cb => cb.value);
+
             if (gcHandle === 'Other') {
                 gcHandle = document.getElementById('stu-gc-other').value.trim();
             }
 
             if (!name || !idNum || !gcHandle || !classLevel) {
                 showMessage('Please fill in all required fields.', true);
+                return;
+            }
+
+            if (selectedDays.length === 0) {
+                showMessage('Please select at least one day for your schedule.', true);
                 return;
             }
 
@@ -256,22 +313,21 @@
                         const config = await configRes.json();
                         if (config.isLocked) {
                             showMessage('Registration is currently closed by the Admin.', true);
-                            return; // Breaks out to the finally block
+                            return; 
                         }
                     }
                 } catch (err) {
                     console.warn("Could not check lock status, proceeding anyway.");
                 }
 
-                // 2. NEW: PREVENT DUPLICATES - Check if student ID is already registered
+                // 2. PREVENT DUPLICATES - Check if student ID is already registered
                 const checkRes = await fetch(`${API_BASE_URL}/students`);
                 if (checkRes.ok) {
                     const existingStudents = await checkRes.json();
                     
-                    // Look for matching ID (case-insensitive)
                     if (existingStudents.some(s => s.id.toLowerCase() === idNum.toLowerCase())) {
                         showMessage('This Student ID is already registered!', true);
-                        return; // Breaks out to the finally block
+                        return; 
                     }
                 }
 
@@ -280,7 +336,7 @@
                     id: idNum,
                     classLevel: classLevel,
                     gcHandle: gcHandle,
-                    assignedDays: [] // Defaults to unassigned
+                    assignedDays: selectedDays // Array of chosen days
                 };
 
                 // 3. Post directly to the backend to add the student
@@ -314,9 +370,9 @@
                     btn.textContent = 'REGISTERED ✔';
                     btn.style.backgroundColor = 'var(--success)';
                     btn.style.color = '#000';
-                    // We purposefully leave btn.disabled = true here!
+                    // Purposely leaving btn.disabled = true
                 } else {
-                    // Only unlock the button if it failed, so they can try again
+                    // Unlock the button if it failed, so they can try again
                     btn.disabled = false;
                     btn.textContent = 'REGISTER NOW';
                 }
