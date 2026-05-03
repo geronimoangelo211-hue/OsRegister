@@ -3,52 +3,302 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Online Support Data Register</title>
-    <link rel="stylesheet" href="register.css">
+    <title>Student Self-Registration</title>
+    <style>
+        :root {
+            --bg-dark: #0f1115;
+            --panel-bg: #1e2128;
+            --text-main: #f8fafc;
+            --text-muted: #9ca3af;
+            --accent: #66fcf1;
+            --accent-hover: #45a29e;
+            --error: #ef4444;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background-color: var(--panel-bg);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            max-width: 450px;
+            width: 100%;
+            border: 1px solid #2d313c;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: var(--accent);
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        /* NEW: Highlighted Warning Text */
+        .warning-box {
+            background-color: rgba(239, 68, 68, 0.15);
+            color: var(--error);
+            border: 1px solid var(--error);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            line-height: 1.4;
+            text-align: center;
+            margin-bottom: 25px;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.2);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: var(--text-main);
+        }
+
+        .instructions {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0;
+            margin-bottom: 8px;
+            font-style: italic;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            background-color: #121419;
+            border: 1px solid #333a45;
+            color: var(--text-main);
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus {
+            border-color: var(--accent);
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--accent);
+            color: #000;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 15px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s;
+            margin-top: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        button:disabled {
+            background-color: #334155;
+            color: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .message {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            min-height: 20px;
+        }
+
+        .success { color: #22c55e; }
+        .error { color: var(--error); }
+    </style>
 </head>
 <body>
-    <div class="register-panel" id="loading-screen">
-        <h3 style="color: #94a3b8;">Verifying secure link...</h3>
-    </div>
 
-    <div class="register-panel" id="register-form-container" style="display: none;">
-        <h2>Online Support Data Register</h2>
-        <p class="subtitle">Please fill out your official details below.</p>
+    <div class="container">
+        <h2>Student Support Registration</h2>
+        
+        <!-- UPDATED WARNING TEXT -->
+        <div class="warning-box">
+            Please fill out the form and follow the instructions carefully. Double-check your answers before submitting. Any mistakes MAY RESULTS IN NO ATTENDANCE BEING RECORDED.
+        </div>
 
-        <form onsubmit="submitRegistration(event)">
-            <label class="schedule-label" style="margin-bottom: 5px;">Name: (Last Name, First Name MI.)</label>
-            <input type="text" id="reg-name" placeholder="E.g., Dela Cruz, Juan M." required oninput="formatName(this)">
-            
-            <label class="schedule-label" style="margin-bottom: 5px; margin-top: 15px;">Student Number:</label>
-            <input type="text" id="reg-id" placeholder="06-2*2*-******" required oninput="formatStudentId(this)">
-
-            <select id="reg-gc" onchange="toggleOtherGC(this.value)" required>
-                <option value="">-- Select Group Chat Handle --</option>
-                <option value="BSA">BSA</option>
-                <option value="BSIT">BSIT</option>
-                <option value="BSED ENG">BSED ENG</option>
-                <option value="BSHM">BSHM</option>
-                <option value="BSCRIM">BSCRIM</option>
-                <option value="BSN">BSN</option>
-                <option value="Other">Other (Specify)</option>
-            </select>
-            <input type="text" id="reg-gc-other" placeholder="Specify Handle" style="display: none; margin-top: 5px;">
-
-            <label class="schedule-label">Select Your Assigned Days:</label>
-            <div class="days-grid">
-                <label class="day-checkbox"><input type="checkbox" name="schedule" value="Monday"> Monday</label>
-                <label class="day-checkbox"><input type="checkbox" name="schedule" value="Tuesday"> Tuesday</label>
-                <label class="day-checkbox"><input type="checkbox" name="schedule" value="Wednesday"> Wednesday</label>
-                <label class="day-checkbox"><input type="checkbox" name="schedule" value="Thursday"> Thursday</label>
-                <label class="day-checkbox"><input type="checkbox" name="schedule" value="Friday"> Friday</label>
-                <label class="day-checkbox"><input type="checkbox" name="schedule" value="Saturday"> Saturday</label>
-                <label class="day-checkbox"><input type="checkbox" name="schedule" value="Sunday"> Sunday</label>
+        <form id="registrationForm">
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" id="stu-name" placeholder="e.g. Dela Cruz, Juan" required>
             </div>
 
-            <button type="submit" class="submit-btn">SUBMIT REGISTRATION</button>
+            <div class="form-group">
+                <label>Student ID Number</label>
+                <input type="text" id="stu-id" placeholder="e.g. 06-2425-01234" required>
+            </div>
+
+            <!-- NEW: Class Level Selection with Instructions -->
+            <div class="form-group">
+                <label>Class Level</label>
+                <p class="instructions">Select "Freshmen" if this is your first year, otherwise select "UpperClassmen".</p>
+                <select id="stu-class" required>
+                    <option value="">-- Select Class Level --</option>
+                    <option value="Freshmen">Freshmen</option>
+                    <option value="UpperClassmen">UpperClassmen</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>GC Handle / Department</label>
+                <p class="instructions">Select the groupchat tag corresponding to your department.</p>
+                <select id="stu-gc" onchange="toggleOther(this.value)" required>
+                    <option value="">-- Select GC Handle --</option>
+                    <option value="BSA">BSA</option>
+                    <option value="BSIT">BSIT</option>
+                    <option value="BSED ENG">BSED ENG</option>
+                    <option value="BSPT">BSPT</option>
+                    <option value="BSHM">BSHM</option>
+                    <option value="BSTM">BSTM</option>
+                    <option value="BSCRIM">BSCRIM</option>
+                    <option value="BSPHARMA">BSPHARMA</option>
+                    <option value="BSRESPI">BSRESPI</option>
+                    <option value="BSED FIL">BSED FIL</option>
+                    <option value="BSN">BSN</option>
+                    <option value="BSPSYCH">BSPSYCH</option>
+                    <option value="RAD">RAD</option>
+                    <option value="BSRADTECH">BSRADTECH</option>
+                    <option value="BEED">BEED</option>
+                    <option value="BSBA-FM">BSBA-FM</option>
+                    <option value="BSBA-MM">BSBA-MM</option>
+                    <option value="BSMT">BSMT</option>
+                    <option value="Other">Other (Type manually)</option>
+                </select>
+                <input type="text" id="stu-gc-other" style="display:none; margin-top: 10px;" placeholder="Type Custom GC Handle">
+            </div>
+
+            <button type="submit" id="submitBtn">REGISTER NOW</button>
+            <div id="statusMessage" class="message"></div>
         </form>
     </div>
 
-    <script src="register.js"></script>
+    <script>
+        // Make sure this points to your live backend!
+        const API_BASE_URL = "https://support-backend-ldos.onrender.com/api";
+
+        function toggleOther(val) {
+            const otherInput = document.getElementById('stu-gc-other');
+            if (val === 'Other') {
+                otherInput.style.display = 'block';
+                otherInput.required = true;
+            } else {
+                otherInput.style.display = 'none';
+                otherInput.required = false;
+                otherInput.value = '';
+            }
+        }
+
+        function showMessage(text, isError) {
+            const msgEl = document.getElementById('statusMessage');
+            msgEl.textContent = text;
+            msgEl.className = 'message ' + (isError ? 'error' : 'success');
+            setTimeout(() => { msgEl.textContent = ''; }, 5000);
+        }
+
+        document.getElementById('registrationForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const btn = document.getElementById('submitBtn');
+            const name = document.getElementById('stu-name').value.trim();
+            const idNum = document.getElementById('stu-id').value.trim();
+            const classLevel = document.getElementById('stu-class').value;
+            let gcHandle = document.getElementById('stu-gc').value;
+
+            if (gcHandle === 'Other') {
+                gcHandle = document.getElementById('stu-gc-other').value.trim();
+            }
+
+            if (!name || !idNum || !gcHandle || !classLevel) {
+                showMessage('Please fill in all required fields.', true);
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'SUBMITTING...';
+
+            // Check if backend is locked (optional safety measure)
+            try {
+                const configRes = await fetch(`${API_BASE_URL}/config/status`);
+                if (configRes.ok) {
+                    const config = await configRes.json();
+                    if (config.isLocked) {
+                        showMessage('Registration is currently closed by the Admin.', true);
+                        btn.disabled = false;
+                        btn.textContent = 'REGISTER NOW';
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.warn("Could not check lock status, proceeding anyway.");
+            }
+
+            const payload = {
+                name: name,
+                id: idNum,
+                classLevel: classLevel,
+                gcHandle: gcHandle,
+                assignedDays: [] // Defaults to unassigned
+            };
+
+            try {
+                // Post directly to the backend to add the student
+                const response = await fetch(`${API_BASE_URL}/students`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        showMessage('Registration Successful! You may close this page.', false);
+                        document.getElementById('registrationForm').reset();
+                        document.getElementById('stu-gc-other').style.display = 'none';
+                    } else {
+                        showMessage(data.message || 'Error saving registration.', true);
+                    }
+                } else {
+                    showMessage('Server error. Please try again later.', true);
+                }
+
+            } catch (error) {
+                showMessage('Network error. Unable to connect to server.', true);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'REGISTER NOW';
+            }
+        });
+    </script>
 </body>
 </html>
