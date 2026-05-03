@@ -164,11 +164,11 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
                 showMessage(data.message || 'Error saving registration.', true);
             }
         } else {
-            showMessage('Server error. Please try again later.', true);
+            showMessage('Server closed. Please try again later.', true);
         }
 
     } catch (error) {
-        showMessage('Network error. Unable to connect to server.', true);
+        showMessage('Network Error, Please try again', true);
     } finally {
         if (!isSuccess) {
             btn.disabled = false;
