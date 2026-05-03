@@ -72,14 +72,6 @@
             color: var(--text-main);
         }
 
-        .instructions {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-top: 0;
-            margin-bottom: 8px;
-            font-style: italic;
-        }
-
         input[type="text"], select {
             width: 100%;
             padding: 12px;
@@ -97,7 +89,6 @@
             border-color: var(--accent);
         }
 
-        /* Schedule Checkbox Grid Styling */
         .schedule-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -153,8 +144,8 @@
         }
 
         button:disabled {
-            background-color: #334155;
-            color: #9ca3af;
+            background-color: #334155 !important;
+            color: #9ca3af !important;
             cursor: not-allowed;
             transform: none;
         }
@@ -169,6 +160,41 @@
 
         .success { color: var(--success); }
         .error { color: var(--error); }
+
+        /* Modal Styles for GIF Pop-up */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 17, 21, 0.9);
+            backdrop-filter: blur(5px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: var(--panel-bg);
+            padding: 30px;
+            border-radius: 12px;
+            border: 1px solid var(--accent);
+            text-align: center;
+            max-width: 350px;
+            width: 90%;
+            box-shadow: 0 0 30px rgba(102, 252, 241, 0.2);
+            animation: popIn 0.3s ease-out forwards;
+        }
+
+        .modal-content img {
+            max-width: 100%;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -193,7 +219,7 @@
 
             <div class="form-group">
                 <label>Class Level</label>
-                <p class="instructions">Select "Freshmen" if this is your first year, otherwise select "UpperClassmen".</p>
+                <!-- Removed instructions -->
                 <select id="stu-class" required>
                     <option value="">-- Select Class Level --</option>
                     <option value="Freshmen">Freshmen</option>
@@ -203,7 +229,7 @@
 
             <div class="form-group">
                 <label>GC Handle / Department</label>
-                <p class="instructions">Select the groupchat tag corresponding to your department.</p>
+                <!-- Removed instructions -->
                 <select id="stu-gc" onchange="toggleOther(this.value)" required>
                     <option value="">-- Select GC Handle --</option>
                     <option value="BSA">BSA</option>
@@ -229,10 +255,8 @@
                 <input type="text" id="stu-gc-other" style="display:none; margin-top: 10px;" placeholder="Type Custom GC Handle">
             </div>
 
-            <!-- NEW: Schedule Assignment -->
             <div class="form-group">
                 <label>Shift Schedule Assignment</label>
-                <p class="instructions">Select the specific days you are required to log in for duty.</p>
                 <div class="schedule-grid">
                     <label><input type="checkbox" class="day-checkbox" value="Monday"> Monday</label>
                     <label><input type="checkbox" class="day-checkbox" value="Tuesday"> Tuesday</label>
@@ -249,9 +273,26 @@
         </form>
     </div>
 
+    <!-- Success GIF Modal -->
+    <div id="success-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <!-- Points to the specific file in your repo -->
+            <img src="thank-you-gif-6.gif" alt="Success!">
+            <h3 style="color: var(--accent); margin-top: 0; margin-bottom: 10px;">Registration Complete!</h3>
+            <p style="color: var(--text-muted); font-size: 14px; margin: 0;">You have successfully registered your support schedule. You may now safely close this window.</p>
+            <button onclick="closeModal()" style="margin-top: 20px;">Got it!</button>
+        </div>
+    </div>
+
     <script>
-        // Make sure this points to your live backend!
         const API_BASE_URL = "https://support-backend-ldos.onrender.com/api";
+        const COOLDOWN_TIME = 5 * 60 * 1000; // 5 minutes in milliseconds
+        let cooldownInterval;
+
+        // On Page Load: Check if user is in cooldown
+        document.addEventListener('DOMContentLoaded', () => {
+            startCooldownTimer();
+        });
 
         function toggleOther(val) {
             const otherInput = document.getElementById('stu-gc-other');
@@ -269,20 +310,56 @@
             const msgEl = document.getElementById('statusMessage');
             msgEl.textContent = text;
             msgEl.className = 'message ' + (isError ? 'error' : 'success');
-            
             setTimeout(() => { msgEl.textContent = ''; }, 5000);
+        }
+
+        function closeModal() {
+            document.getElementById('success-modal').style.display = 'none';
+        }
+
+        function startCooldownTimer() {
+            const lastReg = localStorage.getItem('registration_cooldown_time');
+            if (!lastReg) return;
+            
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            
+            clearInterval(cooldownInterval);
+            cooldownInterval = setInterval(() => {
+                const timePassed = Date.now() - parseInt(lastReg);
+                const timeLeft = COOLDOWN_TIME - timePassed;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(cooldownInterval);
+                    localStorage.removeItem('registration_cooldown_time');
+                    btn.disabled = false;
+                    btn.textContent = 'REGISTER NOW';
+                } else {
+                    const mins = Math.floor(timeLeft / 60000);
+                    const secs = Math.floor((timeLeft % 60000) / 1000);
+                    btn.textContent = `COOLDOWN (${mins}:${secs.toString().padStart(2, '0')})`;
+                }
+            }, 1000);
         }
 
         document.getElementById('registrationForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const btn = document.getElementById('submitBtn');
+            
+            // Failsafe check
+            if (localStorage.getItem('registration_cooldown_time')) {
+                const timePassed = Date.now() - parseInt(localStorage.getItem('registration_cooldown_time'));
+                if (timePassed < COOLDOWN_TIME) {
+                    showMessage('Please wait for the cooldown to expire before registering again.', true);
+                    return;
+                }
+            }
+
             const name = document.getElementById('stu-name').value.trim();
             const idNum = document.getElementById('stu-id').value.trim();
             const classLevel = document.getElementById('stu-class').value;
             let gcHandle = document.getElementById('stu-gc').value;
-
-            // Get selected schedule days
             const selectedDays = Array.from(document.querySelectorAll('.day-checkbox:checked')).map(cb => cb.value);
 
             if (gcHandle === 'Other') {
@@ -299,14 +376,13 @@
                 return;
             }
 
-            // Immediately lock button to prevent double-clicks
             btn.disabled = true;
             btn.textContent = 'SUBMITTING...';
 
             let isSuccess = false;
 
             try {
-                // 1. Check if backend is locked
+                // 1. Check Lock Status
                 try {
                     const configRes = await fetch(`${API_BASE_URL}/config/status`);
                     if (configRes.ok) {
@@ -320,11 +396,10 @@
                     console.warn("Could not check lock status, proceeding anyway.");
                 }
 
-                // 2. PREVENT DUPLICATES - Check if student ID is already registered
+                // 2. Duplicate ID Check
                 const checkRes = await fetch(`${API_BASE_URL}/students`);
                 if (checkRes.ok) {
                     const existingStudents = await checkRes.json();
-                    
                     if (existingStudents.some(s => s.id.toLowerCase() === idNum.toLowerCase())) {
                         showMessage('This Student ID is already registered!', true);
                         return; 
@@ -336,25 +411,31 @@
                     id: idNum,
                     classLevel: classLevel,
                     gcHandle: gcHandle,
-                    assignedDays: selectedDays // Array of chosen days
+                    assignedDays: selectedDays 
                 };
 
-                // 3. Post directly to the backend to add the student
+                // 3. Post to backend
                 const response = await fetch(`${API_BASE_URL}/students`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
 
                 if (response.ok) {
                     const data = await response.json();
                     if (data.success) {
-                        showMessage('Registration Successful! You may close this page.', false);
+                        isSuccess = true;
+                        
+                        // Show GIF Pop-up
+                        document.getElementById('success-modal').style.display = 'flex';
+                        
+                        // Clear Form
                         document.getElementById('registrationForm').reset();
                         document.getElementById('stu-gc-other').style.display = 'none';
-                        isSuccess = true;
+                        
+                        // Trigger Cooldown
+                        localStorage.setItem('registration_cooldown_time', Date.now());
+                        startCooldownTimer();
                     } else {
                         showMessage(data.message || 'Error saving registration.', true);
                     }
@@ -365,14 +446,7 @@
             } catch (error) {
                 showMessage('Network error. Unable to connect to server.', true);
             } finally {
-                // If successful, permanently lock the button with a green success message
-                if (isSuccess) {
-                    btn.textContent = 'REGISTERED ✔';
-                    btn.style.backgroundColor = 'var(--success)';
-                    btn.style.color = '#000';
-                    // Purposely leaving btn.disabled = true
-                } else {
-                    // Unlock the button if it failed, so they can try again
+                if (!isSuccess) {
                     btn.disabled = false;
                     btn.textContent = 'REGISTER NOW';
                 }
