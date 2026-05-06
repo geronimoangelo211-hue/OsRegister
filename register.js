@@ -25,7 +25,7 @@ function showMessage(text, isError) {
     const msgEl = document.getElementById('statusMessage');
     msgEl.textContent = text;
     msgEl.className = 'message ' + (isError ? 'error' : 'success');
-    setTimeout(() => { msgEl.textContent = ''; }, 5000);
+    setTimeout(() => { msgEl.textContent = ''; }, 6000);
 }
 
 function closeModal() {
@@ -103,16 +103,23 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
     try {
         let serverStudents = [];
         try {
-            // FIX 1: URL Cache-Busting parameter ensures the browser ALWAYS asks the live server
-            const syncRes = await fetch(`${API_BASE_URL}/sync/pull?nocache=${new Date().getTime()}`, { cache: 'no-store' });
+            // Force bypass all Vercel/Browser caches
+            const syncRes = await fetch(`${API_BASE_URL}/sync/pull?nocache=${new Date().getTime()}`, { 
+                cache: 'no-store',
+                headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' }
+            });
             
             if (syncRes.ok) {
                 const syncData = await syncRes.json();
                 
-                // FIX 2: Bulletproof string scan. No JSON parsing crashes.
-                let isRegOpen = false;
-                if (syncData.config && String(syncData.config).includes('"regOpen":true')) {
-                    isRegOpen = true;
+                // ULTIMATE FAIL-SAFE: Default to OPEN unless explicitly closed by the Admin
+                let isRegOpen = true; 
+                if (syncData.config && syncData.config !== "{}" && syncData.config !== "null") {
+                    const confStr = String(syncData.config).replace(/\s/g, '').toLowerCase();
+                    // If the server explicitly says it's closed, then block it.
+                    if (confStr.includes('"regopen":false') || confStr.includes("'regopen':false") || confStr.includes("regopen:false")) {
+                        isRegOpen = false;
+                    }
                 }
                 
                 if (!isRegOpen) {
@@ -120,18 +127,12 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
                     return; 
                 }
                 
-                // Load existing students
+                // Load existing students safely
                 if (syncData.students && syncData.students !== "[]" && syncData.students !== "null") {
                     let parsedStudents = syncData.students;
-                    if (typeof parsedStudents === 'string') {
-                        try { parsedStudents = JSON.parse(parsedStudents); } catch(e){}
-                    }
-                    if (typeof parsedStudents === 'string') {
-                        try { parsedStudents = JSON.parse(parsedStudents); } catch(e){} // Catch double stringify
-                    }
-                    if (Array.isArray(parsedStudents)) {
-                        serverStudents = parsedStudents;
-                    }
+                    try { if (typeof parsedStudents === 'string') parsedStudents = JSON.parse(parsedStudents); } catch(e){}
+                    try { if (typeof parsedStudents === 'string') parsedStudents = JSON.parse(parsedStudents); } catch(e){}
+                    if (Array.isArray(parsedStudents)) serverStudents = parsedStudents;
                 }
             }
         } catch (err) {
