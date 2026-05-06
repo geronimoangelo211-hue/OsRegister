@@ -33,7 +33,6 @@ function showMessage(text, isError) {
 
 function closeModal() {
     document.getElementById('success-modal').style.display = 'none';
-    // Optionally un-hide the form if they close it, though they are technically done.
     document.getElementById('registrationForm').style.display = 'block';
 }
 
@@ -112,7 +111,9 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
         // 1. Check Lock Status & Grab Students using the New Master Sync Engine
         let serverStudents = [];
         try {
-            const syncRes = await fetch(`${API_BASE_URL}/sync/pull`);
+            // FIX: Added { cache: 'no-store' } to force the browser to read the LIVE lock status, not the cached memory!
+            const syncRes = await fetch(`${API_BASE_URL}/sync/pull`, { cache: 'no-store' });
+            
             if (syncRes.ok) {
                 const syncData = await syncRes.json();
                 
@@ -122,7 +123,8 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
                     configObj = JSON.parse(syncData.config);
                 }
                 
-                if (configObj.regOpen !== true) {
+                // FIX: Added a check for both boolean and string just in case it saves weirdly
+                if (configObj.regOpen !== true && configObj.regOpen !== "true") {
                     showMessage('Registration is currently closed by the Admin.', true);
                     return; 
                 }
@@ -157,7 +159,6 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-                // We only send students. The Java backend safely ignores logs/config!
                 students: JSON.stringify(serverStudents) 
             }) 
         });
