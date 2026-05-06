@@ -102,8 +102,9 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
 
     try {
         let serverStudents = [];
+        
+        // Step 1: Pull existing students ONLY for duplicate ID checking
         try {
-            // Force bypass all Vercel/Browser caches
             const syncRes = await fetch(`${API_BASE_URL}/sync/pull?nocache=${new Date().getTime()}`, { 
                 cache: 'no-store',
                 headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' }
@@ -111,21 +112,6 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
             
             if (syncRes.ok) {
                 const syncData = await syncRes.json();
-                
-                // ULTIMATE FAIL-SAFE: Default to OPEN unless explicitly closed by the Admin
-                let isRegOpen = true; 
-                if (syncData.config && syncData.config !== "{}" && syncData.config !== "null") {
-                    const confStr = String(syncData.config).replace(/\s/g, '').toLowerCase();
-                    // If the server explicitly says it's closed, then block it.
-                    if (confStr.includes('"regopen":false') || confStr.includes("'regopen':false") || confStr.includes("regopen:false")) {
-                        isRegOpen = false;
-                    }
-                }
-                
-                if (!isRegOpen) {
-                    showMessage('Registration is currently closed by the Admin.', true);
-                    return; 
-                }
                 
                 // Load existing students safely
                 if (syncData.students && syncData.students !== "[]" && syncData.students !== "null") {
@@ -136,16 +122,16 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
                 }
             }
         } catch (err) {
-            showMessage('Network error while checking server status.', true);
-            return;
+            console.warn("Network issue pulling students, proceeding anyway.");
         }
 
-        // Duplicate Check
+        // Step 2: Duplicate ID Check
         if (serverStudents.some(s => String(s.id).toLowerCase() === String(idNum).toLowerCase())) {
             showMessage('This Student ID is already registered!', true);
             return; 
         }
 
+        // Step 3: Add the new student
         serverStudents.push({
             name: name,
             id: idNum,
@@ -154,7 +140,7 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
             assignedDays: selectedDays 
         });
 
-        // Push to Cloud
+        // Step 4: Push updated list to Cloud
         const response = await fetch(`${API_BASE_URL}/sync/push`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -177,11 +163,11 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
                 showMessage(data.message || 'Error saving registration.', true);
             }
         } else {
-            showMessage('Server closed. Please try again later.', true);
+            showMessage('Server error. Please try again later.', true);
         }
 
     } catch (error) {
-        showMessage('Network Error, Please try again', true);
+        showMessage('Network Error, Please check your connection.', true);
     } finally {
         clearInterval(loadingInterval);
         if (isSuccess) {
