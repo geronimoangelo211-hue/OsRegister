@@ -98,50 +98,68 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
 
     // Immediately lock button to prevent double-clicks
     btn.disabled = true;
-    btn.textContent = 'SUBMITTING...';
+    let dotCount = 1;
+    btn.textContent = 'Registering.';
+    
+    const loadingInterval = setInterval(() => {
+        dotCount = (dotCount % 3) + 1; // Cycles 1, 2, 3
+        btn.textContent = 'Registering' + '.'.repeat(dotCount);
+    }, 400); // 400ms update speed
 
     let isSuccess = false;
 
     try {
-        // 1. Check Lock Status
+        // 1. Check Lock Status & Grab Students using the New Master Sync Engine
+        let serverStudents = [];
         try {
-            const configRes = await fetch(`${API_BASE_URL}/config/status`);
-            if (configRes.ok) {
-                const config = await configRes.json();
-                if (config.isLocked) {
+            const syncRes = await fetch(`${API_BASE_URL}/sync/pull`);
+            if (syncRes.ok) {
+                const syncData = await syncRes.json();
+                
+                // A. Verify Registration is Open
+                let configObj = { regOpen: false }; // Defaults to closed for security
+                if (syncData.config && syncData.config !== "{}" && syncData.config !== "null") {
+                    configObj = JSON.parse(syncData.config);
+                }
+                
+                if (configObj.regOpen !== true) {
                     showMessage('Registration is currently closed by the Admin.', true);
                     return; 
                 }
+                
+                // B. Load active students for duplicate checking
+                if (syncData.students && syncData.students !== "[]" && syncData.students !== "null") {
+                    serverStudents = JSON.parse(syncData.students);
+                }
             }
         } catch (err) {
-            console.warn("Could not check lock status, proceeding anyway.");
+            showMessage('Network error while checking server status.', true);
+            return;
         }
 
         // 2. Duplicate ID Check
-        const checkRes = await fetch(`${API_BASE_URL}/students`);
-        if (checkRes.ok) {
-            const existingStudents = await checkRes.json();
-            
-            // Look for matching ID (case-insensitive)
-            if (existingStudents.some(s => String(s.id).toLowerCase() === String(idNum).toLowerCase())) {
-                showMessage('This Student ID is already registered!', true);
-                return; 
-            }
+        if (serverStudents.some(s => String(s.id).toLowerCase() === String(idNum).toLowerCase())) {
+            showMessage('This Student ID is already registered!', true);
+            return; 
         }
 
-        const payload = {
+        // 3. Prepare the new student payload
+        serverStudents.push({
             name: name,
             id: idNum,
             classLevel: classLevel,
             gcHandle: gcHandle,
             assignedDays: selectedDays 
-        };
+        });
 
-        // 3. Post to backend
-        const response = await fetch(`${API_BASE_URL}/students`, {
+        // 4. Save directly to the new Cloud Sync Engine!
+        const response = await fetch(`${API_BASE_URL}/sync/push`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: JSON.stringify({ 
+                // We only send students. The Java backend safely ignores logs/config!
+                students: JSON.stringify(serverStudents) 
+            }) 
         });
 
         if (response.ok) {
@@ -170,7 +188,14 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
     } catch (error) {
         showMessage('Network Error, Please try again', true);
     } finally {
-        if (!isSuccess) {
+        // Stop the text animation loop
+        clearInterval(loadingInterval);
+
+        if (isSuccess) {
+            btn.textContent = 'REGISTERED ✔';
+            btn.style.backgroundColor = 'var(--success)';
+            btn.style.color = '#000';
+        } else {
             btn.disabled = false;
             btn.textContent = 'REGISTER NOW';
         }
