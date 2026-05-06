@@ -161,7 +161,6 @@
         .success { color: var(--success); }
         .error { color: var(--error); }
 
-        /* Modal Styles for GIF Pop-up */
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -281,6 +280,9 @@
     </div>
 
     <script>
+        console.log("%cSTOP!", "color: red; font-size: 50px; font-weight: bold; font-family: sans-serif; text-shadow: 2px 2px 0 #000;");
+        console.log("%cBawal ka dito panget", "color: white; background: red; font-size: 16px; padding: 5px 10px; border-radius: 5px;");
+
         const API_BASE_URL = "https://support-backend-ldos.onrender.com/api";
         const COOLDOWN_TIME = 5 * 60 * 1000; 
         let cooldownInterval;
@@ -305,8 +307,12 @@
             const msgEl = document.getElementById('statusMessage');
             msgEl.textContent = text;
             msgEl.className = 'message ' + (isError ? 'error' : 'success');
-            
-            setTimeout(() => { msgEl.textContent = ''; }, 5000);
+            setTimeout(() => { msgEl.textContent = ''; }, 6000);
+        }
+
+        function closeModal() {
+            document.getElementById('success-modal').style.display = 'none';
+            document.getElementById('registrationForm').style.display = 'block';
         }
 
         function startCooldownTimer() {
@@ -353,9 +359,7 @@
             let gcHandle = document.getElementById('stu-gc').value;
             const selectedDays = Array.from(document.querySelectorAll('.day-checkbox:checked')).map(cb => cb.value);
 
-            if (gcHandle === 'Other') {
-                gcHandle = document.getElementById('stu-gc-other').value.trim();
-            }
+            if (gcHandle === 'Other') gcHandle = document.getElementById('stu-gc-other').value.trim();
 
             if (!name || !idNum || !gcHandle || !classLevel) {
                 showMessage('Please fill in all required fields.', true);
@@ -367,67 +371,74 @@
                 return;
             }
 
-            // Lock button and start loop animation
             btn.disabled = true;
             let dotCount = 1;
             btn.textContent = 'Registering.';
             
             const loadingInterval = setInterval(() => {
-                dotCount = (dotCount % 3) + 1; // Cycles 1, 2, 3
+                dotCount = (dotCount % 3) + 1;
                 btn.textContent = 'Registering' + '.'.repeat(dotCount);
-            }, 400); // 400ms update speed
+            }, 400);
 
             let isSuccess = false;
 
             try {
+                let serverStudents = [];
+                
+                // Step 1: Pull existing students ONLY for duplicate ID checking
                 try {
-                    const configRes = await fetch(`${API_BASE_URL}/config/status`);
-                    if (configRes.ok) {
-                        const config = await configRes.json();
-                        if (config.isLocked) {
-                            showMessage('Registration is currently closed by the Admin.', true);
-                            return; 
+                    const syncRes = await fetch(`${API_BASE_URL}/sync/pull?nocache=${new Date().getTime()}`, { 
+                        cache: 'no-store',
+                        headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' }
+                    });
+                    
+                    if (syncRes.ok) {
+                        const syncData = await syncRes.json();
+                        
+                        // Load existing students safely
+                        if (syncData.students && syncData.students !== "[]" && syncData.students !== "null") {
+                            let parsedStudents = syncData.students;
+                            try { if (typeof parsedStudents === 'string') parsedStudents = JSON.parse(parsedStudents); } catch(e){}
+                            try { if (typeof parsedStudents === 'string') parsedStudents = JSON.parse(parsedStudents); } catch(e){}
+                            if (Array.isArray(parsedStudents)) serverStudents = parsedStudents;
                         }
                     }
                 } catch (err) {
-                    console.warn("Could not check lock status, proceeding anyway.");
+                    console.warn("Network issue pulling students, proceeding anyway.");
                 }
 
-                const checkRes = await fetch(`${API_BASE_URL}/students`);
-                if (checkRes.ok) {
-                    const existingStudents = await checkRes.json();
-                    
-                    if (existingStudents.some(s => String(s.id).toLowerCase() === String(idNum).toLowerCase())) {
-                        showMessage('This Student ID is already registered!', true);
-                        return; 
-                    }
+                // Step 2: Duplicate ID Check
+                if (serverStudents.some(s => String(s.id).toLowerCase() === String(idNum).toLowerCase())) {
+                    showMessage('This Student ID is already registered!', true);
+                    return; 
                 }
 
-                const payload = {
+                // Step 3: Add the new student
+                serverStudents.push({
                     name: name,
                     id: idNum,
                     classLevel: classLevel,
                     gcHandle: gcHandle,
                     assignedDays: selectedDays 
-                };
+                });
 
-                const response = await fetch(`${API_BASE_URL}/students`, {
+                // Step 4: Push updated list to Cloud
+                const response = await fetch(`${API_BASE_URL}/sync/push`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({ 
+                        students: JSON.stringify(serverStudents) 
+                    }) 
                 });
 
                 if (response.ok) {
                     const data = await response.json();
                     if (data.success) {
                         isSuccess = true;
-                        
                         document.getElementById('registrationForm').style.display = 'none';
                         document.getElementById('success-modal').style.display = 'flex';
-                        
                         document.getElementById('registrationForm').reset();
                         document.getElementById('stu-gc-other').style.display = 'none';
-                        
                         localStorage.setItem('registration_cooldown_time', Date.now());
                         startCooldownTimer();
                     } else {
@@ -438,11 +449,9 @@
                 }
 
             } catch (error) {
-                showMessage('Network error. Unable to connect to server.', true);
+                showMessage('Network Error, Please check your connection.', true);
             } finally {
-                // Stop the text animation loop
                 clearInterval(loadingInterval);
-
                 if (isSuccess) {
                     btn.textContent = 'REGISTERED ✔';
                     btn.style.backgroundColor = 'var(--success)';
