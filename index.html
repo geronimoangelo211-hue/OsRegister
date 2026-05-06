@@ -385,9 +385,9 @@
             try {
                 let serverStudents = [];
                 
-                // Step 1: Pull existing students ONLY for duplicate ID checking
+                // Step 1: INSTANT CLOUD CHECK (Bypasses Cache Completely)
                 try {
-                    const syncRes = await fetch(`${API_BASE_URL}/sync/pull?nocache=${new Date().getTime()}`, { 
+                    const syncRes = await fetch(`${API_BASE_URL}/sync/pull?nocache=${Date.now()}`, { 
                         cache: 'no-store',
                         headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' }
                     });
@@ -395,6 +395,30 @@
                     if (syncRes.ok) {
                         const syncData = await syncRes.json();
                         
+                        // === BULLETPROOF LOCK CHECK ===
+                        let isRegOpen = false; // Assumes closed until proven open
+                        if (syncData.config && syncData.config !== "{}" && syncData.config !== "null") {
+                            try {
+                                let parsed = typeof syncData.config === 'string' ? JSON.parse(syncData.config) : syncData.config;
+                                if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+                                if (parsed && (parsed.regOpen === true || String(parsed.regOpen).toLowerCase() === "true")) {
+                                    isRegOpen = true;
+                                }
+                            } catch(e) {
+                                const cleanStr = String(syncData.config).replace(/\s/g, '').replace(/"/g, '').toLowerCase();
+                                if (cleanStr.includes('regopen:true')) {
+                                    isRegOpen = true;
+                                }
+                            }
+                        }
+                        
+                        // IF ADMIN CLOSED IT, STOP IMMEDIATELY
+                        if (!isRegOpen) {
+                            showMessage('Registration is currently closed by the Admin.', true);
+                            return; 
+                        }
+                        // ================================
+
                         // Load existing students safely
                         if (syncData.students && syncData.students !== "[]" && syncData.students !== "null") {
                             let parsedStudents = syncData.students;
@@ -402,9 +426,13 @@
                             try { if (typeof parsedStudents === 'string') parsedStudents = JSON.parse(parsedStudents); } catch(e){}
                             if (Array.isArray(parsedStudents)) serverStudents = parsedStudents;
                         }
+                    } else {
+                        showMessage('Could not verify lock status. Server busy.', true);
+                        return;
                     }
                 } catch (err) {
-                    console.warn("Network issue pulling students, proceeding anyway.");
+                    showMessage('Network issue contacting server. Try again.', true);
+                    return;
                 }
 
                 // Step 2: Duplicate ID Check
